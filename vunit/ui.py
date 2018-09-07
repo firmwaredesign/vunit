@@ -877,9 +877,15 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
             test_information = test_suite.test_information
             for name in test_suite.test_names:
                 info = test_information[name]
+
+                attributes = {}
+                for attr in info.attributes:
+                    attributes[attr.name] = attr.value
+
                 tests.append(dict(name=name,
                                   file_name=info.file_name,
-                                  lineno=info.lineno))
+                                  lineno=info.lineno,
+                                  attributes=attributes))
 
         json_data = dict(
             # The semantic version (https://semver.org/) of the JSON export data format
