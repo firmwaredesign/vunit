@@ -25,6 +25,8 @@ entity avalon_master is
     bus_handle          : bus_master_t;
     use_readdatavalid   : boolean := true;
     fixed_read_latency  : natural := 1;  -- (bus cycles).  This parameter is ignored when use_readdatavalid is true
+    write_wait_time     : natural := 0;  -- (bus cucles).  This will add write fixed waitstates
+    read_wait_time      : natural := 0;  -- (bus cucles).  This will add read fixed waitstates
     write_high_probability : real range 0.0 to 1.0 := 1.0;
     read_high_probability : real range 0.0 to 1.0 := 1.0
   );
@@ -70,7 +72,9 @@ begin
           address <= pop_std_ulogic_vector(request_msg);
           byteenable(byteenable'range) <= (others => '1');
           read <= '1';
-          wait until rising_edge(clk) and waitrequest = '0';
+          for i in 1 to (read_wait_time + 1) loop   -- Fixed wait states wait
+             wait until rising_edge(clk) and waitrequest = '0';
+          end loop;
           read <= '0';
           push(acknowledge_queue, request_msg);
 
@@ -82,7 +86,9 @@ begin
           writedata <= pop_std_ulogic_vector(request_msg);
           byteenable <= pop_std_ulogic_vector(request_msg);
           write <= '1';
-          wait until rising_edge(clk) and waitrequest = '0';
+          for i in 1 to (write_wait_time + 1) loop  -- Fixed wait states wait
+            wait until rising_edge(clk) and waitrequest = '0';
+          end loop;
           write <= '0';
 
         else
@@ -96,18 +102,21 @@ begin
 
   read_capture : process
     variable request_msg, reply_msg : msg_t;
+    variable wait_time : natural;
   begin
+    wait_time := fixed_read_latency + read_wait_time;   -- We have to wait both fixed read wait states and fixed read latency
     if use_readdatavalid then
         wait until readdatavalid = '1' and rising_edge(clk);
     else
         -- Non-pipelined case: waits for slave to de-assert waitrequest and sample data after fixed_read_latency cycles.
         wait until rising_edge(clk) and waitrequest = '0' and read = '1';
-        if fixed_read_latency > 0 then
-            for i in 0 to fixed_read_latency - 1 loop
+        if wait_time > 0 then
+            for i in 1 to wait_time loop
                 wait until rising_edge(clk);
             end loop;
         end if;
     end if;
+    wait until read = '0';  -- Added in case we don't use readdatavalid and fixed_read_latency = 0 to avoid rase condition between push/pop acknowledge_queue
     request_msg := pop(acknowledge_queue);
     reply_msg := new_msg(sender => av_master_read_actor);
     push_std_ulogic_vector(reply_msg, readdata);
