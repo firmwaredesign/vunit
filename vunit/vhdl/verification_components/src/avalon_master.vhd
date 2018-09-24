@@ -58,6 +58,10 @@ begin
     rnd.InitSeed(rnd'instance_name);
     write <= '0';
     read  <= '0';
+    address <= (address'range => '0');
+    writedata <= (writedata'range => '0');
+    byteenable <= (byteenable'range => '0');
+    burstcount <= (burstcount'range => '0');
     wait until rising_edge(clk);
     loop
       request_msg := null_msg;
